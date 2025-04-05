@@ -32,7 +32,7 @@ void Widget::returnMoney() {
     for (int i=0; i<4; i++) {
         int change = money / coin[i];
         if (change>0) {
-            msg += std::to_string(coin[i]) + "원 " + std::to_string(change) + "개, ";
+            msg += QString::number(coin[i]) + "원 " + QString::number(change) + "개, ";
         }
         money = money % coin[i];
     }
@@ -54,12 +54,8 @@ void Widget::setPb() {
 
     int price[4]  = {1, 100, 150, 200};
 
-    for (int i=0; i<4; i++) {
-        if (money < price[i]) {
-            buttons[i]->setEnabled(false);
-        } else {
-            buttons[i]->setEnabled(true);
-        }
+    for (int i=0; i<buttons.size(); i++) {
+        buttons[i]->setEnabled(money >= price[i]);
     }
 }
 
