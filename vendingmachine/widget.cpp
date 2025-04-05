@@ -1,8 +1,6 @@
 #include "widget.h"
 #include "ui_widget.h"
-# include <QMessageBox>
-
-// int money{0};
+#include <QMessageBox>
 
 
 Widget::Widget(QWidget *parent)
@@ -10,6 +8,7 @@ Widget::Widget(QWidget *parent)
     , ui(new Ui::Widget)
 {
     ui->setupUi(this);
+    setPb();
 }
 
 Widget::~Widget()
@@ -17,18 +16,53 @@ Widget::~Widget()
     delete ui;
 }
 
-void Widget::changeMoney(int diff) {
-    money += diff;
+void Widget::changeMoney(int diff, bool reset) {
+    if (reset) {
+        money = 0;
+    } else {
+        money += diff;
+    }
     ui->lcdNumber->display(money);
+    setPb();
 }
 
-bool Widget::checkMoney(int cost) {
-    if (money > cost) {
-        return true;
-    } else{
-        return false;
+void Widget::returnMoney() {
+    int coin[4] = {500, 100, 50, 10};
+    QString msg = "잔돈: ";
+    for (int i=0; i<4; i++) {
+        int change = money / coin[i];
+        if (change>0) {
+            msg += std::to_string(coin[i]) + "원 " + std::to_string(change) + "개, ";
+        }
+        money = money % coin[i];
+    }
+    msg.chop(2);
+    showMsgbox(msg);
+}
+
+void Widget::showMsgbox(QString msg) {
+    QMessageBox::information(this, "알림", msg);
+}
+
+void Widget::setPb() {
+    QList<QPushButton*> buttons = {
+        ui->pbReset,
+        ui->pbCoffee,
+        ui->pbTea,
+        ui->pbMilk
+    };
+
+    int price[4]  = {1, 100, 150, 200};
+
+    for (int i=0; i<4; i++) {
+        if (money < price[i]) {
+            buttons[i]->setEnabled(false);
+        } else {
+            buttons[i]->setEnabled(true);
+        }
     }
 }
+
 
 void Widget::on_pb10_clicked()
 {
@@ -54,41 +88,31 @@ void Widget::on_pb500_clicked()
 }
 
 
-void Widget::on_pbClear_clicked()
+void Widget::on_pbReset_clicked()
 {
-    money = 0;
-    ui->lcdNumber->display(money);
-    QMessageBox msgbx;
-    msgbx.information(nullptr,"remain", "10won");
+    returnMoney();
+    changeMoney(0, true);
 }
 
 
 void Widget::on_pbCoffee_clicked()
 {
-    QMessageBox msgbx;
-    if (checkMoney(100)) {
-        changeMoney(-100);
-        msgbx.information(nullptr,"Output", "10won");
-    } else {
-
-    }
+    changeMoney(-100);
+    showMsgbox("Coffee");
 }
 
 
-void Widget::on_pbMilktea_clicked()
+void Widget::on_pbTea_clicked()
 {
-
+    changeMoney(-150);
+    showMsgbox("Tea");
 }
 
 
-void Widget::on_pbJasmintea_clicked()
+void Widget::on_pbMilk_clicked()
 {
-
+    changeMoney(-200);
+    showMsgbox("Milk");
 }
 
-
-void Widget::on_pbLatte_clicked()
-{
-
-}
 

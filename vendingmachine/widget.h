@@ -2,6 +2,7 @@
 #define WIDGET_H
 
 #include <QWidget>
+#include <QMessageBox>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -21,8 +22,10 @@ public:
     ~Widget();
 
     int money{0};
-    void changeMoney(int diff);
-    bool checkMoney(int cost);
+    void changeMoney(int diff, bool reset=false);
+    void returnMoney();
+    void showMsgbox(QString msg);
+    void setPb();
 
 private slots:
     void on_pb10_clicked();
@@ -33,15 +36,13 @@ private slots:
 
     void on_pb500_clicked();
 
-    void on_pbClear_clicked();
+    void on_pbReset_clicked();
 
     void on_pbCoffee_clicked();
 
-    void on_pbMilktea_clicked();
+    void on_pbTea_clicked();
 
-    void on_pbJasmintea_clicked();
-
-    void on_pbLatte_clicked();
+    void on_pbMilk_clicked();
 
 private:
     Ui::Widget *ui;
