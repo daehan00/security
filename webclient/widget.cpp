@@ -8,15 +8,14 @@ Widget::Widget(QWidget *parent)
     ui->setupUi(this);
     loadSettings();
 
-    QObject::connect(&tcpSocket_, &QAbstractSocket::connected, this, &Widget::doConnected);
-    QObject::connect(&tcpSocket_, &QAbstractSocket::disconnected, this, &Widget::doDisconnected);
-    QObject::connect(&tcpSocket_, &QIODevice::readyRead, this, &Widget::doReadyRead);
-    QObject::connect(&sslSocket_, &QAbstractSocket::connected, this, &Widget::doConnected);
-    QObject::connect(&sslSocket_, &QAbstractSocket::disconnected, this, &Widget::doDisconnected);
-    QObject::connect(&sslSocket_, &QIODevice::readyRead, this, &Widget::doReadyRead);
+    QList<QAbstractSocket*> sockets = {&tcpSocket_, &sslSocket_};
 
-    connect(&tcpSocket_, &QAbstractSocket::stateChanged, this, &Widget::updatePb);
-    connect(&sslSocket_, &QAbstractSocket::stateChanged, this, &Widget::updatePb);
+    for (QAbstractSocket* sk : sockets) {
+        QObject::connect(sk, &QAbstractSocket::connected, this, &Widget::doConnected);
+        QObject::connect(sk, &QAbstractSocket::disconnected, this, &Widget::doDisconnected);
+        QObject::connect(sk, &QIODevice::readyRead, this, &Widget::doReadyRead);
+        QObject::connect(sk, &QAbstractSocket::stateChanged, this, &Widget::updatePb);
+    };
 }
 
 Widget::~Widget()
@@ -26,23 +25,23 @@ Widget::~Widget()
 
 void Widget::updatePb() {
     QAbstractSocket::SocketState state = socket_->state();
-    bool disable=false;
 
-    // 버튼 비활성화
-    if (state==QAbstractSocket::ConnectedState) {
-        ui->pbConnect->setEnabled(false);
-        ui->pbSend->setEnabled(true);
-        ui->pbDisconnect->setEnabled(true);
-        disable=true;
-    } else if (state==QAbstractSocket::UnconnectedState) {
-        ui->pbConnect->setEnabled(true);
-        ui->pbSend->setEnabled(false);
-        ui->pbDisconnect->setEnabled(false);
-    }
     // 연결 주소 설정 비활성화
-    ui->cbSsl->setDisabled(disable);
-    ui->leHost->setDisabled(disable);
-    ui->lePort->setDisabled(disable);
+    bool connected = false;
+    if (state==QAbstractSocket::ConnectedState) {
+        connected=true;
+    }
+
+    // con에서 활성화하는 객체와 비활성화하는 객체 배열
+    QList<QWidget*> con = {ui->pbSend, ui->pbDisconnect};
+    QList<QWidget*> dCon = {ui->pbConnect, ui->cbSsl, ui->leHost, ui->lePort};
+
+    for (QWidget* item : con) {
+        item->setEnabled(connected);
+    }
+    for (QWidget* item : dCon) {
+        item->setDisabled(connected);
+    }
 }
 
 void Widget::saveSettings() {
