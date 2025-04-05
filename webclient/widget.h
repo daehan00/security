@@ -4,6 +4,8 @@
 #include <QWidget>
 #include <QTcpSocket>
 #include <QSslSocket>
+#include <QFile>
+#include <QSettings>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -25,6 +27,9 @@ public:
     QSslSocket sslSocket_;
 
     void updatePb();
+    void saveSettings();
+    void loadSettings();
+    void closeEvent(QCloseEvent *event);
 
 public slots:
     void doConnected();
