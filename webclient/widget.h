@@ -19,8 +19,12 @@ public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
 
-    // QTcpSocket socket_;
-    QSslSocket socket_;
+    bool sslSocket=false;
+    QAbstractSocket* socket_ = nullptr;
+    QTcpSocket tcpSocket_;
+    QSslSocket sslSocket_;
+
+    void updatePb();
 
 public slots:
     void doConnected();
@@ -33,6 +37,10 @@ private slots:
     void on_pbDisconnect_clicked();
 
     void on_pbSend_clicked();
+
+    void on_pbClear_clicked();
+
+    void on_cbSsl_checkStateChanged(const Qt::CheckState &arg1);
 
 private:
     Ui::Widget *ui;
