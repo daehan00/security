@@ -26,7 +26,7 @@ Widget::~Widget()
 void Widget::updatePb() {
     QAbstractSocket::SocketState state = socket_->state();
 
-    // 연결 주소 설정 비활성화
+    // 연결 상태 확인
     bool connected = false;
     if (state==QAbstractSocket::ConnectedState) {
         connected=true;
@@ -36,6 +36,7 @@ void Widget::updatePb() {
     QList<QWidget*> con = {ui->pbSend, ui->pbDisconnect};
     QList<QWidget*> dCon = {ui->pbConnect, ui->cbSsl, ui->leHost, ui->lePort};
 
+    // 활성/비활성 적용
     for (QWidget* item : con) {
         item->setEnabled(connected);
     }
