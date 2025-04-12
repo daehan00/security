@@ -29,7 +29,7 @@ public:
     void updatePb();
     void saveSettings();
     void loadSettings();
-    void closeEvent(QCloseEvent *event);
+    void closeEvent(QCloseEvent *event) override;
 
 public slots:
     void doConnected();

@@ -7,6 +7,7 @@ Widget::Widget(QWidget *parent)
 {
     ui->setupUi(this);
     loadSettings();
+    updatePb();
 
     QList<QAbstractSocket*> sockets = {&tcpSocket_, &sslSocket_};
 
@@ -73,6 +74,7 @@ void Widget::loadSettings() {
         ui->leHost->setText("www.naver.com");
         ui->lePort->setText("80");
         ui->pteSend->setPlainText("GET / HTTP/1.1\r\nHost: www.naver.com\r\n\r\n");
+        socket_ = &tcpSocket_; // 기본값 socket_ 포인터 설정
         return;
     }
 
@@ -84,7 +86,7 @@ void Widget::loadSettings() {
         ui->lePort->setText(in.readLine());
         QString sslValue = in.readLine();
         ui->cbSsl->setChecked(sslValue.trimmed() == "1");
-        if (ui->cbSsl->isChecked()) {
+        if (ui->cbSsl->isChecked()) { // 기본값 socket_ 포인터 설정
             socket_ = &sslSocket_;
         } else {
             socket_ = &tcpSocket_;
