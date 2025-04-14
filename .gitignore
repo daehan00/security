@@ -30,7 +30,6 @@ qrc_*.cpp
 .qtcreator/
 
 # Makefile 관련
-Makefile
 Makefile.Debug
 Makefile.Release
 
