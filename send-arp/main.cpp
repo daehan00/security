@@ -36,7 +36,9 @@ typedef struct {
 Param param = {
     .dev_ = nullptr,
     .pairs = {},
-    .count = 0
+    .count = 0,
+    .myMac = Mac(),
+    .myIp = Ip()
 };
 
 Mac getMyMac(const char* dev) {
