@@ -77,6 +77,11 @@ void getMyInfo(Param* params) {
     close(fd);
 }
 
+bool isValidIp(const char* ipStr) {
+    struct sockaddr_in sa;
+    return inet_pton(AF_INET, ipStr, &(sa.sin_addr)) == 1;
+}
+
 bool parse(Param* params, int argc, char* argv[]) {
     if (argc < 4 || (argc - 2) % 2 != 0) {
         usage();
@@ -93,8 +98,16 @@ bool parse(Param* params, int argc, char* argv[]) {
     }
 
     for (int i=0; i<params->count; i++) { // 192.0.0.1 => network byte => host byte
-        params->pairs[i].sender_ip = Ip(ntohl(inet_addr(argv[2 + i * 2])));
-        params->pairs[i].target_ip = Ip(ntohl(inet_addr(argv[3 + i * 2])));
+        const char* sender_str = argv[2 + i * 2];
+        const char* target_str = argv[3 + i * 2];
+
+        if (!isValidIp(sender_str) || !isValidIp(target_str)) {
+            fprintf(stderr, "[ERROR] Invalid IP format at pair #%d: %s / %s\n", i+1, sender_str, target_str);
+            return false;
+        }
+
+        params->pairs[i].sender_ip = Ip(ntohl(inet_addr(sender_str)));
+        params->pairs[i].target_ip = Ip(ntohl(inet_addr(target_str)));
     }
 
     return true;
@@ -123,20 +136,20 @@ Mac queryMacByArp(Ip senderIp) {
     packet.arp_.sip_ = htonl(params.myIp);
     packet.arp_.tip_ = htonl(senderIp);
 
-    if (pcap_sendpacket(pcap, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket)) != 0) {
+    if (pcap_sendpacket(pcap, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket)) != 0) { // success:0, fail:-1
         fprintf(stderr, "[ERROR] send ARP request failed: %s\n", pcap_geterr(pcap));
         exit(1);
     }
 
-    for (int attempt=0; attempt<MAX_ATTEMPTS; ++attempt) {
+    for (int attempt=0; attempt<MAX_ATTEMPTS; attempt++) {
         struct pcap_pkthdr* header;
         const u_char* pkt;
         int res = pcap_next_ex(pcap, &header, &pkt);
-        if (res == 0) { // if no resposne, wait and retry
+        if (res == 0) { // timeout
             usleep(WAIT_USEC);
             continue;
         }
-        if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) {
+        if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) { // -1 or -2
             fprintf(stderr, "[ERROR] pcap_next_ex failed: %s\n", pcap_geterr(pcap));
             break;
         }
@@ -165,7 +178,7 @@ int main(int argc, char* argv[]) {
     pcap_t* pcap = pcap_open_live(params.dev_, 0, 0, 0, errbuf); // only sending
     if (pcap == nullptr) {
         fprintf(stderr, "[ERROR] couldn't open device %s(%s)\n", params.dev_, errbuf);
-        return EXIT_FAILURE;
+        return 1;
     }
 
     for (int i=0; i<params.count; i++) {
@@ -184,13 +197,14 @@ int main(int argc, char* argv[]) {
         packet.arp_.pln_ = Ip::Size;
         packet.arp_.op_ = htons(ArpHdr::Reply);
         packet.arp_.smac_ = params.myMac;
-        packet.arp_.sip_ = htonl(targetIp); // network byte order
+        packet.arp_.sip_ = htonl(targetIp);
         packet.arp_.tmac_ = senderMac;
         packet.arp_.tip_ = htonl(senderIp);
 
         int res = pcap_sendpacket(pcap, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
         if (res != 0) {
             fprintf(stderr, "[ERROR] pcap_sendpacket return %d error=%s\n", res, pcap_geterr(pcap));
+            return 1;
         }
 
         printf("#%u Sender: %s , Target: %s\n", i + 1,
