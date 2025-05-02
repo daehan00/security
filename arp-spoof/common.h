@@ -2,8 +2,7 @@
 #define COMMON_H
 
 #include <QString>
-#include <QPair>
-#include <vector>
+
 #include "ip.h"
 #include "mac.h"
 #include "ethhdr.h"
@@ -15,27 +14,17 @@ struct EthArpPacket final {
     ArpHdr arp_;
 };
 
-typedef struct {
-    char* interface;
+struct IpFlow {
+    QString iface;
     Ip sender_ip; // host byte order
     Ip target_ip; // host byte order
+    Ip my_ip;
     Mac sender_mac;
+    Mac target_mac;
     Mac my_mac;
-} IpFlow;
-
-struct ArpEntry {
-    Ip ip;
-    Mac mac;
+    pcap_t* handle;
 };
 
-struct FlowPair {
-    Ip senderIp;
-    Mac senderMac;
-    Ip targetIp;
-    Mac targetMac;
-};
-
-using ArpTable = std::vector<ArpEntry>;
-using FlowList = std::vector<FlowPair>;
+void getMyInfo(IpFlow& flow);
 
 #endif

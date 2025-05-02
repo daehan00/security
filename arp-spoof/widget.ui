@@ -39,9 +39,9 @@
    <property name="geometry">
     <rect>
      <x>370</x>
-     <y>130</y>
+     <y>40</y>
      <width>181</width>
-     <height>191</height>
+     <height>261</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_5">
@@ -50,7 +50,7 @@
       <item>
        <widget class="QLabel" name="targetLabel">
         <property name="text">
-         <string>Target IP:</string>
+         <string>Target IP&amp;MAC:</string>
         </property>
        </widget>
       </item>
@@ -58,14 +58,20 @@
        <widget class="QTextBrowser" name="targetIpTb"/>
       </item>
       <item>
+       <widget class="QTextBrowser" name="targetMacTb"/>
+      </item>
+      <item>
        <widget class="QLabel" name="senderLabel">
         <property name="text">
-         <string>Sender IP:</string>
+         <string>Sender IP&amp;MAC:</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QTextBrowser" name="senderIpTb"/>
+      </item>
+      <item>
+       <widget class="QTextBrowser" name="senderMacTb"/>
       </item>
      </layout>
     </item>
@@ -121,10 +127,10 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>20</x>
-     <y>40</y>
+     <x>30</x>
+     <y>10</y>
      <width>201</width>
-     <height>71</height>
+     <height>111</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">

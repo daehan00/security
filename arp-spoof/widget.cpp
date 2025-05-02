@@ -81,7 +81,20 @@ void Widget::on_setInterfacePb_clicked() {
 
 void Widget::on_startPb_clicked() {
     appendStatus("[INFO] 공격 시작 (sender: " + ui->senderIpTb->toPlainText() + ")");
-    // 실제 공격 로직 연결 예정
+
+    IpFlow flow;
+    flow.iface = ui->interfaceTe->toPlainText().trimmed();
+    flow.sender_ip = Ip(ui->senderIpTb->toPlainText().toStdString());
+    flow.target_ip = Ip(ui->targetIpTb->toPlainText().toStdString());
+    flow.sender_mac = Mac(ui->senderMacTb->toPlainText().toStdString());
+    flow.target_mac = Mac(ui->senderMacTb->toPlainText().toStdString());
+    getMyInfo(flow);
+
+
+    // char errbuf[PCAP_ERRBUF_SIZE];
+    // QByteArray ifaceBytes = flow.iface.toUtf8();
+    // flow.handle = pcap_open_live(ifaceBytes.constData(), BUFSIZ, 1, 1, errbuf);
+    // Infector* infector = new Infector(flow);
 }
 
 void Widget::on_stopPb_clicked() {
@@ -92,22 +105,25 @@ void Widget::on_stopPb_clicked() {
 void Widget::on_ipAddrTable_cellDoubleClicked(int row, int column) {
     if (row < 0 || column < 0) return;
 
-    // IP 주소는 항상 0번째 열에 있다고 가정
-    QTableWidgetItem* item = ui->ipAddrTable->item(row, 0);
-    if (!item) return;
+    QTableWidgetItem* ipItem = ui->ipAddrTable->item(row, 0);
+    QTableWidgetItem* macItem = ui->ipAddrTable->item(row, 1);
+    if (!ipItem || !macItem) return;
 
-    QString ip = item->text();
+    QString ip = ipItem->text();
+    QString mac = macItem->text();
 
     // 타겟/보내는 쪽 중 어디에 넣을지는 상황에 따라 다르게 처리 가능
     // 여기서는 target → sender 순으로 선택
 
     if (ui->targetIpTb->toPlainText().isEmpty()) {
         ui->targetIpTb->setPlainText(ip);
+        ui->targetMacTb->setPlainText(mac);
     } else if (ui->senderIpTb->toPlainText().isEmpty()) {
         ui->senderIpTb->setPlainText(ip);
+        ui->senderMacTb->setPlainText(mac);
     } else {
         // 이미 둘 다 채워진 경우 사용자에게 알림
-        QMessageBox::information(this, "알림", "Target/Sender IP가 이미 모두 설정되어 있습니다.");
+        QMessageBox::information(this, "알림", "Target/Sender 가 이미 모두 설정되어 있습니다.");
     }
 }
 
