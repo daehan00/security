@@ -45,3 +45,4 @@ install_manifest.txt
 # 기타
 **/*.o
 **/.DS_Store
+.vscode/

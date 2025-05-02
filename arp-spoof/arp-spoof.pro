@@ -10,19 +10,29 @@ CONFIG += c++17
 SOURCES += \
         arphdr.cpp \
         ethhdr.cpp \
+        infector.cpp \
         ip.cpp \
+        loader.cpp \
         mac.cpp \
         main.cpp \
+        packetdispatcher.cpp \
+        packetrelay.cpp \
         widget.cpp
 
 HEADERS += \
         arphdr.h \
+        common.h \
         ethhdr.h \
+        infector.h \
         ip.h \
+        loader.h \
         mac.h \
+        packetdispatcher.h \
+        packetrelay.h \
         widget.h
 
 FORMS += \
+    loader.ui \
     widget.ui
 
 # Default rules for deployment.
