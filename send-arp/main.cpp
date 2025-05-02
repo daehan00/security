@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstring>
 #include <pcap.h>
+#include <vector>
 #include <unistd.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -9,9 +10,7 @@
 #include "ethhdr.h"
 #include "arphdr.h"
 
-#define MAX_PAIR 10
 #define MAX_ATTEMPTS 5
-#define WAIT_USEC 10000
 
 #pragma pack(push, 1)
 struct EthArpPacket final {
@@ -24,12 +23,11 @@ typedef struct {
     Ip sender_ip; // host byte order
     Ip target_ip; // host byte order
     Mac sender_mac;
-} IpPair;
+} IpFlow;
 
 typedef struct {
     char* dev_;
-    IpPair pairs[MAX_PAIR];
-    int count;
+    std::vector<IpFlow> pairs;;
     Mac myMac;
     Ip myIp;
 } Param;
@@ -37,7 +35,6 @@ typedef struct {
 Param params = {
     .dev_ = nullptr,
     .pairs = {},
-    .count = 0,
     .myMac = Mac(),
     .myIp = Ip()
 };
@@ -72,7 +69,7 @@ void getMyInfo(Param* params) {
         exit(1);
     }
     struct sockaddr_in* ipaddr = (struct sockaddr_in*)&ifr.ifr_addr;
-    params->myIp = Ip(ntohl(ipaddr->sin_addr.s_addr));
+    params->myIp = Ip(ipaddr->sin_addr.s_addr);
 
     close(fd);
 }
@@ -91,13 +88,7 @@ bool parse(Param* params, int argc, char* argv[]) {
     params->dev_ = argv[1];
     getMyInfo(params); // my information(ip, mac)
 
-    params->count = (argc - 2) / 2;
-    if (params->count > MAX_PAIR) {
-        fprintf(stderr, "[ERROR] Too many IP pairs! Maximum allowed is %d.\n", MAX_PAIR);
-        return false;
-    }
-
-    for (int i=0; i<params->count; i++) { // 192.0.0.1 => network byte => host byte
+    for (int i=0; i<(argc - 2) / 2; i++) { // 192.0.0.1 => network byte => host byte
         const char* sender_str = argv[2 + i * 2];
         const char* target_str = argv[3 + i * 2];
 
@@ -106,17 +97,16 @@ bool parse(Param* params, int argc, char* argv[]) {
             return false;
         }
 
-        params->pairs[i].sender_ip = Ip(ntohl(inet_addr(sender_str)));
-        params->pairs[i].target_ip = Ip(ntohl(inet_addr(target_str)));
+        params->pairs.push_back({Ip(sender_str), Ip(target_str), Mac()});
     }
 
     return true;
 }
 
-Mac queryMacByArp(Ip senderIp) {
+Mac resolveMacByArp(Ip senderIp) {
     pcap_t* pcap;
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap = pcap_open_live(params.dev_, BUFSIZ, 1, 1000, errbuf);
+    pcap = pcap_open_live(params.dev_, BUFSIZ, 1, 1, errbuf);
     if (pcap == nullptr) {
         fprintf(stderr, "[ERROR] pcap_open_live(%s) failed: %s\n", params.dev_, errbuf);
         exit(1);
@@ -146,7 +136,6 @@ Mac queryMacByArp(Ip senderIp) {
         const u_char* pkt;
         int res = pcap_next_ex(pcap, &header, &pkt);
         if (res == 0) { // timeout
-            usleep(WAIT_USEC);
             continue;
         }
         if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) { // -1 or -2
@@ -181,11 +170,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    for (int i=0; i<params.count; i++) {
+    for (int i=0; i<params.pairs.size(); i++) {
         EthArpPacket packet;
         Ip senderIp = params.pairs[i].sender_ip;
         Ip targetIp = params.pairs[i].target_ip;
-        Mac senderMac = queryMacByArp(senderIp);
+        Mac senderMac = resolveMacByArp(senderIp);
 
         packet.eth_.dmac_ = senderMac;
         packet.eth_.smac_ = params.myMac;
