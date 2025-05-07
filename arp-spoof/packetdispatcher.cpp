@@ -36,9 +36,9 @@ void PacketDispatcher::processPacket(const struct pcap_pkthdr* header, const u_c
     PEthHdr eth = (PEthHdr)packet;
     if (eth->type() == EthHdr::Arp) {
         EthArpPacket* arp = (EthArpPacket*)packet;
-        if (arp->arp_.op() == ArpHdr::Reply &&
-            arp->arp_.sip() == flow.sender_ip &&
-            arp->arp_.tmac() == flow.sender_mac) {
+        if (arp->arp_.op() == ArpHdr::Request &&
+            arp->arp_.sip() == flow.target_ip &&
+            arp->eth_.dmac() == Mac("ff:ff:ff:ff:ff:ff")) {
             // 감염이 풀렸다고 판단
             if (infector) infector->trigger();
         }
@@ -55,11 +55,13 @@ void PacketDispatcher::processPacket(const struct pcap_pkthdr* header, const u_c
     SharedPacket spkt;
     spkt.data = QByteArray((const char*)packet, header->caplen);
 
-    if (src_ip == flow.sender_ip && dst_ip == flow.target_ip) {
+    if (src_ip == flow.sender_ip || eth->smac() == flow.sender_mac) {
         spkt.toSender = false; // sender → target
         queue->enqueue(spkt);
-    } else if (src_ip == flow.target_ip && dst_ip == flow.sender_ip) {
+        // emit logMessage("[Dispatcher] sender packet enqueue");
+    } else if (dst_ip == flow.sender_ip && eth->dmac() == flow.my_mac) {
         spkt.toSender = true; // target → sender
         queue->enqueue(spkt);
+        // emit logMessage("[Dispatcher] target packet enqueue");
     }
 }

@@ -86,7 +86,7 @@ void Widget::on_startPb_clicked() {
     flow.sender_ip = Ip(ui->senderIpTb->toPlainText().toStdString());
     flow.target_ip = Ip(ui->targetIpTb->toPlainText().toStdString());
     flow.sender_mac = Mac(ui->senderMacTb->toPlainText().toStdString());
-    flow.target_mac = Mac(ui->senderMacTb->toPlainText().toStdString());
+    flow.target_mac = Mac(ui->targetMacTb->toPlainText().toStdString());
     saveMyIpMacAddr(flow);
 
 

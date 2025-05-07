@@ -16,7 +16,7 @@ void PacketRelay::run() {
         SharedPacket packet = queue->dequeue();
         if (packet.data.isEmpty()) break;
 
-        if (auto eth = packet.ethHdr()) {
+        if (auto eth = reinterpret_cast<PEthHdr>(packet.data.data())) {
             // MAC 주소 조작
             eth->smac_ = flow.my_mac;
             if (packet.toSender) {
@@ -33,5 +33,6 @@ void PacketRelay::run() {
         if (res != 0) {
             fprintf(stderr, "[ERROR] pcap_sendpacket failed: %s\n", pcap_geterr(flow.handle));
         }
+        // emit logMessage("[Relay] packet relay");
     }
 }

@@ -28,14 +28,20 @@ protected:
 
 private:
     IpFlow flow;
-    EthArpPacket infectionPacket;
+    EthArpPacket senderInfectionPacket;
+    EthArpPacket targetInfectionPacket;
+
+    enum class InfectTarget {
+        Sender,
+        Target
+    };
 
     QMutex mutex;
     QWaitCondition cond;
     std::atomic<bool> triggered {false};
     std::atomic<bool> running {true};
 
-    void sendInfection();  // ARP 감염 패킷 전송
+    void sendInfection(InfectTarget target);  // ARP 감염 패킷 전송
 };
 
 #endif // INFECTOR_H
