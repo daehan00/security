@@ -18,6 +18,9 @@ public:
     void trigger();       // 외부에서 즉시 감염 요청
     void killTrigger();   // 스레드 종료 요청
 
+signals:
+    void logMessage(const QString&);
+
 
 protected:
     void run() override;
@@ -33,7 +36,6 @@ private:
     std::atomic<bool> running {true};
 
     void sendInfection();  // ARP 감염 패킷 전송
-
 };
 
 #endif // INFECTOR_H

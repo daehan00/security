@@ -1,10 +1,30 @@
 #ifndef PACKETDISPATCHER_H
 #define PACKETDISPATCHER_H
 
-class PacketDispatcher
-{
+#include <QThread>
+#include "common.h"
+#include <infector.h>
+
+class PacketDispatcher : public QThread {
+    Q_OBJECT
 public:
-    PacketDispatcher();
+    PacketDispatcher(PacketQueue* queue, const IpFlow& flow, QObject* parent = nullptr);
+    void stop();
+    void setInfector(Infector* infector);
+
+signals:
+    void logMessage(const QString&);
+
+protected:
+    void run() override;
+
+private:
+    PacketQueue* queue;
+    IpFlow flow;
+    std::atomic<bool> running {true};
+    Infector* infector = nullptr;
+
+    void processPacket(const struct pcap_pkthdr* header, const u_char* packet);
 };
 
 #endif // PACKETDISPATCHER_H

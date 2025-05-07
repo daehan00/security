@@ -7,7 +7,28 @@
 #include <cstring>
 #include <iostream>
 
-void getMyInfo(IpFlow& flow) {
+void PacketQueue::enqueue(const SharedPacket& packet) {
+    QMutexLocker locker(&mutex);
+    queue.enqueue(packet);
+    cond.wakeOne();
+}
+
+SharedPacket PacketQueue::dequeue() {
+    QMutexLocker locker(&mutex);
+    while (queue.isEmpty() && running) {
+        cond.wait(&mutex);
+    }
+    if (!running && queue.isEmpty()) return SharedPacket(); // 종료 조건
+    return queue.dequeue();
+}
+
+void PacketQueue::stop() {
+    QMutexLocker locker(&mutex);
+    running = false;
+    cond.wakeAll(); // 대기 중인 스레드 깨우기
+}
+
+void saveMyIpMacAddr(IpFlow& flow) {
     // int fd = socket(AF_INET, SOCK_DGRAM, 0);
     // if (fd < 0) {
     //     perror("socket");

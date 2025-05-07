@@ -3,6 +3,10 @@
 
 #include <QString>
 
+#include <QQueue>
+#include <QMutex>
+#include <QWaitCondition>
+
 #include "ip.h"
 #include "mac.h"
 #include "ethhdr.h"
@@ -25,6 +29,29 @@ struct IpFlow {
     pcap_t* handle;
 };
 
-void getMyInfo(IpFlow& flow);
+struct SharedPacket {
+    QByteArray data;
+    bool toSender; // true면 sender로 보내기, false면 target으로
+
+    PEthHdr ethHdr() {
+        if (static_cast<size_t>(data.size()) < sizeof(EthHdr)) return nullptr;
+        return reinterpret_cast<PEthHdr>(data.data());
+    }
+};
+
+class PacketQueue {
+public:
+    void enqueue(const SharedPacket& packet);
+    SharedPacket dequeue(); // blocking
+    void stop(); // relay에서 종료 시 사용
+
+private:
+    QQueue<SharedPacket> queue;
+    QMutex mutex;
+    QWaitCondition cond;
+    bool running = true;
+};
+
+void saveMyIpMacAddr(IpFlow& flow);
 
 #endif

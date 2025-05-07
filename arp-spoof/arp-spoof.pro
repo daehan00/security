@@ -2,7 +2,8 @@ QT       += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-CONFIG += c++17
+CONFIG += c++
+LIBS += -lpcap
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -25,6 +26,7 @@ HEADERS += \
         ethhdr.h \
         infector.h \
         ip.h \
+        libnet-headers.h \
         mac.h \
         packetdispatcher.h \
         packetrelay.h \

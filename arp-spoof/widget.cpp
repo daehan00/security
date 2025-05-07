@@ -1,7 +1,6 @@
 #include "widget.h"
 #include "ui_widget.h"
 
-#include <QFile>
 #include <QProcess>
 #include <QDateTime>
 #include <QMessageBox>
@@ -88,18 +87,55 @@ void Widget::on_startPb_clicked() {
     flow.target_ip = Ip(ui->targetIpTb->toPlainText().toStdString());
     flow.sender_mac = Mac(ui->senderMacTb->toPlainText().toStdString());
     flow.target_mac = Mac(ui->senderMacTb->toPlainText().toStdString());
-    getMyInfo(flow);
+    saveMyIpMacAddr(flow);
 
 
-    // char errbuf[PCAP_ERRBUF_SIZE];
-    // QByteArray ifaceBytes = flow.iface.toUtf8();
-    // flow.handle = pcap_open_live(ifaceBytes.constData(), BUFSIZ, 1, 1, errbuf);
-    // Infector* infector = new Infector(flow);
+    char errbuf[PCAP_ERRBUF_SIZE];
+    QByteArray ifaceBytes = flow.iface.toUtf8();
+    flow.handle = pcap_open_live(ifaceBytes.constData(), BUFSIZ, 1, 1, errbuf);
+    if (flow.handle == nullptr) {
+        QMessageBox::critical(this, "오류", "인터페이스 열기에 실패했습니다: " + QString(errbuf));
+        return;
+    }
+
+    auto* queue = new PacketQueue();
+    auto* dispatcher = new PacketDispatcher(queue, flow);
+    auto* infector = new Infector(flow);
+    auto* relay = new PacketRelay(queue, flow);
+
+    connect(dispatcher, &PacketDispatcher::logMessage, this, &Widget::appendStatus);
+    connect(infector, &Infector::logMessage, this, &Widget::appendStatus);
+    connect(relay, &PacketRelay::logMessage, this, &Widget::appendStatus);
+
+    dispatcher->setInfector(infector);
+
+    this->dispatcher = dispatcher;
+    this->infector = infector;
+    this->relay = relay;
+
+    dispatcher->start();
+    infector->start();
+    relay->start();
 }
 
 void Widget::on_stopPb_clicked() {
     appendStatus("[INFO] 공격 중지 요청됨");
-    // 공격 스레드 정지 로직 예정
+
+    if (dispatcher && dispatcher->isRunning()) dispatcher->stop();
+    if (relay && relay->isRunning()) relay->stop();
+    if (infector && infector->isRunning()) infector->killTrigger();
+
+    if (dispatcher && dispatcher->isRunning()) dispatcher->wait();
+    if (relay && relay->isRunning()) relay->wait();
+    if (infector && infector->isRunning()) infector->wait();
+
+    delete dispatcher;
+    delete relay;
+    delete infector;
+
+    dispatcher = nullptr;
+    relay = nullptr;
+    infector = nullptr;
 }
 
 void Widget::on_ipAddrTable_cellDoubleClicked(int row, int column) {
