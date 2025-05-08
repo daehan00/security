@@ -24,6 +24,8 @@ private:
     std::atomic<bool> running {true};
     Infector* infector = nullptr;
 
+    void handleArpPacket(const EthArpPacket& arp);
+    void handleIpPacket(const PEthHdr eth, const u_char* packet, int len);
     void processPacket(const struct pcap_pkthdr* header, const u_char* packet);
 };
 

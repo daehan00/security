@@ -40,7 +40,7 @@ Infector::Infector(const IpFlow& flow, QObject* parent)
 
 Infector::~Infector() {
     killTrigger();
-    wait(); // 안전 종료
+    wait();
     emit logMessage("[Infector] 스레드 종료");
 }
 
@@ -63,7 +63,7 @@ void Infector::run() {
 
     while (running) {
         mutex.lock();
-        cond.wait(&mutex, 1000); // 3초 대기 or trigger 깨움
+        cond.wait(&mutex, 1000);
 
         if (!running) {
             mutex.unlock();
@@ -74,7 +74,6 @@ void Infector::run() {
             triggered = false;
             sendInfection(InfectTarget::Sender);
         } else {
-            // 주기 감염
             sendInfection(InfectTarget::Sender);
             sendInfection(InfectTarget::Target);
         }

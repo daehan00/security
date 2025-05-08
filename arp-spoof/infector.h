@@ -15,8 +15,8 @@ public:
     explicit Infector(const IpFlow& flow, QObject* parent = nullptr);
     ~Infector();
 
-    void trigger();       // 외부에서 즉시 감염 요청
-    void killTrigger();   // 스레드 종료 요청
+    void trigger();
+    void killTrigger();
 
 signals:
     void logMessage(const QString&);
@@ -41,7 +41,7 @@ private:
     std::atomic<bool> triggered {false};
     std::atomic<bool> running {true};
 
-    void sendInfection(InfectTarget target);  // ARP 감염 패킷 전송
+    void sendInfection(InfectTarget target);
 };
 
 #endif // INFECTOR_H

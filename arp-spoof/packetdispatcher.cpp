@@ -1,5 +1,5 @@
 #include "packetdispatcher.h"
-#include "libnet-headers.h"
+#include "sniff_headers.h"
 
 PacketDispatcher::PacketDispatcher(PacketQueue* queue, const IpFlow& flow, QObject* parent)
     : QThread(parent), queue(queue), flow(flow)
@@ -12,8 +12,6 @@ void PacketDispatcher::stop() {
 
 void PacketDispatcher::setInfector(Infector* i) {
     infector = i;
-    emit logMessage("[Dispatcher] set infector");
-
 }
 
 void PacketDispatcher::run() {
@@ -23,45 +21,53 @@ void PacketDispatcher::run() {
         const u_char* pkt;
 
         int res = pcap_next_ex(flow.handle, &header, &pkt);
-        if (res == 0) continue; // timeout
+        if (res == 0) continue;
         if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) break;
 
         processPacket(header, pkt);
     }
 }
 
-void PacketDispatcher::processPacket(const struct pcap_pkthdr* header, const u_char* packet) {
-    // if (header->caplen > 1500) return;
+void PacketDispatcher::handleArpPacket(const EthArpPacket& arp) {
+    static const Mac BroadcastMac("ff:ff:ff:ff:ff:ff");
 
-    PEthHdr eth = (PEthHdr)packet;
-    if (eth->type() == EthHdr::Arp) {
-        EthArpPacket* arp = (EthArpPacket*)packet;
-        if (arp->arp_.op() == ArpHdr::Request &&
-            arp->arp_.sip() == flow.target_ip &&
-            arp->eth_.dmac() == Mac("ff:ff:ff:ff:ff:ff")) {
-            // 감염이 풀렸다고 판단
-            if (infector) infector->trigger();
-        }
-        return; // ARP는 큐에 넣지 않음
+    if (arp.arp_.op_ == ArpHdr::Request &&
+        arp.arp_.sip_ == flow.target_ip &&
+        arp.eth_.dmac_ == BroadcastMac &&
+        infector) {
+        infector->trigger();
     }
+}
 
-    if (eth->type() != EthHdr::Ip4) return;
-
-    // IP 검사
+void PacketDispatcher::handleIpPacket(const PEthHdr eth, const u_char* packet, int len) {
     const struct sniff_ip* ip_hdr = (struct sniff_ip*)(packet + sizeof(EthHdr));
+
     Ip src_ip = Ip(ntohl(ip_hdr->ip_src.s_addr));
     Ip dst_ip = Ip(ntohl(ip_hdr->ip_dst.s_addr));
 
     SharedPacket spkt;
-    spkt.data = QByteArray((const char*)packet, header->caplen);
+    spkt.data = QByteArray((const char*)packet, len);
 
     if (src_ip == flow.sender_ip || eth->smac() == flow.sender_mac) {
-        spkt.toSender = false; // sender → target
+        spkt.toSender = false;
         queue->enqueue(spkt);
-        // emit logMessage("[Dispatcher] sender packet enqueue");
     } else if (dst_ip == flow.sender_ip && eth->dmac() == flow.my_mac) {
-        spkt.toSender = true; // target → sender
+        spkt.toSender = true;
         queue->enqueue(spkt);
-        // emit logMessage("[Dispatcher] target packet enqueue");
     }
+}
+
+void PacketDispatcher::processPacket(const struct pcap_pkthdr* header, const u_char* packet) {
+    // if (header->caplen > 1500) return;
+
+    PEthHdr eth = *reinterpret_cast<const PEthHdr*>(packet);
+    if (eth->type() == EthHdr::Arp) {
+        EthArpPacket arp = *reinterpret_cast<const EthArpPacket*>(packet);
+        handleArpPacket(arp);
+        return;
+    }
+
+    if (eth->type() != EthHdr::Ip4) return;
+
+    handleIpPacket(eth, packet, header->caplen);
 }

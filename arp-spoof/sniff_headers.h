@@ -1,6 +1,3 @@
-#ifndef LIBNET_HEADERS_H
-#define LIBNET_HEADERS_H
-
 #include <pcap.h>
 /* Ethernet addresses are 6 bytes */
 #define ETHER_ADDR_LEN	6
@@ -101,6 +98,3 @@ u_int size_ip;
 u_int size_tcp;
 
 #define MACADDRSTRLEN 18;
-
-
-#endif // LIBNET_HEADERS_H

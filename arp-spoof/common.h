@@ -20,8 +20,8 @@ struct EthArpPacket final {
 
 struct IpFlow {
     QString iface;
-    Ip sender_ip; // host byte order
-    Ip target_ip; // host byte order
+    Ip sender_ip;
+    Ip target_ip;
     Ip my_ip;
     Mac sender_mac;
     Mac target_mac;
@@ -31,7 +31,7 @@ struct IpFlow {
 
 struct SharedPacket {
     QByteArray data;
-    bool toSender; // true면 sender로 보내기, false면 target으로
+    bool toSender;
 
     PEthHdr ethHdr() {
         if (static_cast<size_t>(data.size()) < sizeof(EthHdr)) return nullptr;
@@ -42,8 +42,8 @@ struct SharedPacket {
 class PacketQueue {
 public:
     void enqueue(const SharedPacket& packet);
-    SharedPacket dequeue(); // blocking
-    void stop(); // relay에서 종료 시 사용
+    SharedPacket dequeue();
+    void stop();
 
 private:
     QQueue<SharedPacket> queue;

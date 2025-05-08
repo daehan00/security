@@ -6,7 +6,7 @@ PacketRelay::PacketRelay(PacketQueue* queue, const IpFlow& flow, QObject* parent
 
 void PacketRelay::stop() {
     running = false;
-    queue->stop(); // 큐가 비어도 대기 안 하게
+    queue->stop();
     emit logMessage("[Relay] 스레드 종료");
 }
 
@@ -17,7 +17,6 @@ void PacketRelay::run() {
         if (packet.data.isEmpty()) break;
 
         if (auto eth = reinterpret_cast<PEthHdr>(packet.data.data())) {
-            // MAC 주소 조작
             eth->smac_ = flow.my_mac;
             if (packet.toSender) {
                 eth->dmac_ = flow.sender_mac;
@@ -26,13 +25,11 @@ void PacketRelay::run() {
             }
         }
 
-
         int res = pcap_sendpacket(flow.handle,
                                   reinterpret_cast<const u_char*>(packet.data.data()),
                                   packet.data.size());
         if (res != 0) {
             fprintf(stderr, "[ERROR] pcap_sendpacket failed: %s\n", pcap_geterr(flow.handle));
         }
-        // emit logMessage("[Relay] packet relay");
     }
 }

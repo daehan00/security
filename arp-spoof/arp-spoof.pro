@@ -26,10 +26,10 @@ HEADERS += \
         ethhdr.h \
         infector.h \
         ip.h \
-        libnet-headers.h \
         mac.h \
         packetdispatcher.h \
         packetrelay.h \
+        sniff_headers.h \
         widget.h
 
 FORMS += \
