@@ -39,7 +39,7 @@ Infector::Infector(const IpFlow& flow, QObject* parent)
 }
 
 Infector::~Infector() {
-    killTrigger();
+    stop();
     wait();
     emit logMessage("[Infector] 스레드 종료");
 }
@@ -51,7 +51,7 @@ void Infector::trigger() {
     mutex.unlock();
 }
 
-void Infector::killTrigger() {
+void Infector::stop() {
     mutex.lock();
     running = false;
     cond.wakeOne();
@@ -92,6 +92,6 @@ void Infector::sendInfection(InfectTarget target) {
 
     int res = pcap_sendpacket(flow.handle, reinterpret_cast<const u_char*>(packet), sizeof(EthArpPacket));
     if (res != 0) {
-        fprintf(stderr, "[ERROR] pcap_sendpacket return %d error=%s\n", res, pcap_geterr(flow.handle));
+        emit fatalError("[Infector] 패킷 전송 실패: " + QString(pcap_geterr(flow.handle)));
     }
 }

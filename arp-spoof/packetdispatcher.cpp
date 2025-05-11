@@ -22,8 +22,10 @@ void PacketDispatcher::run() {
 
         int res = pcap_next_ex(flow.handle, &header, &pkt);
         if (res == 0) continue;
-        if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) break;
-
+        if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) {
+            emit fatalError("[Dispatcher] 패킷 수집 실패: " + QString(pcap_geterr(flow.handle)));
+            break;
+        }
         processPacket(header, pkt);
     }
 }
@@ -60,7 +62,7 @@ void PacketDispatcher::handleIpPacket(const PEthHdr eth, const u_char* packet, i
 void PacketDispatcher::processPacket(const struct pcap_pkthdr* header, const u_char* packet) {
     // if (header->caplen > 1500) return;
 
-    PEthHdr eth = *reinterpret_cast<const PEthHdr*>(packet);
+    EthHdr* eth = reinterpret_cast<EthHdr*>(const_cast<u_char*>(packet));
     if (eth->type() == EthHdr::Arp) {
         EthArpPacket arp = *reinterpret_cast<const EthArpPacket*>(packet);
         handleArpPacket(arp);

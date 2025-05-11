@@ -14,6 +14,7 @@ public:
 
 signals:
     void logMessage(const QString&);
+    void fatalError(const QString& msg);
 
 protected:
     void run() override;

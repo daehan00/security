@@ -16,10 +16,11 @@ public:
     ~Infector();
 
     void trigger();
-    void killTrigger();
+    void stop();
 
 signals:
     void logMessage(const QString&);
+    void fatalError(const QString& msg);
 
 
 protected:
