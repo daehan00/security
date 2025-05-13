@@ -1,7 +1,6 @@
 #ifndef PACKETDISPATCHER_H
 #define PACKETDISPATCHER_H
 
-#include <QThread>
 #include "common.h"
 #include <infector.h>
 

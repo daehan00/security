@@ -16,7 +16,7 @@ void PacketRelay::run() {
         SharedPacket packet = queue->dequeue();
         if (packet.data.isEmpty()) break;
 
-        if (auto eth = reinterpret_cast<PEthHdr>(packet.data.data())) {
+        if (auto eth = packet.ethHdr()) {
             eth->smac_ = flow.my_mac;
             if (packet.toSender) {
                 eth->dmac_ = flow.sender_mac;
@@ -25,6 +25,7 @@ void PacketRelay::run() {
             }
         }
 
+        QMutexLocker locker(&pcapSendMutex);
         int res = pcap_sendpacket(flow.handle,
                                   reinterpret_cast<const u_char*>(packet.data.data()),
                                   packet.data.size());

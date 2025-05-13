@@ -45,51 +45,54 @@ Infector::~Infector() {
 }
 
 void Infector::trigger() {
-    mutex.lock();
+    QMutexLocker locker(&mutex);
     triggered = true;
     cond.wakeOne();
-    mutex.unlock();
 }
 
 void Infector::stop() {
-    mutex.lock();
+    QMutexLocker locker(&mutex);
     running = false;
     cond.wakeOne();
-    mutex.unlock();
 }
 
 void Infector::run() {
     emit logMessage("[Infector] 스레드 시작");
 
+    QElapsedTimer timer;
+    timer.start();
+
     while (running) {
-        mutex.lock();
-        cond.wait(&mutex, 1000);
+        {
+            QMutexLocker locker(&mutex);
+            cond.wait(&mutex, 50);
 
-        if (!running) {
-            mutex.unlock();
-            break;
+            if (!running) break;
+
+            if (triggered) {
+                triggered = false;
+                sendInfection(true);
+            }
         }
 
-        if (triggered) {
-            triggered = false;
-            sendInfection(InfectTarget::Sender);
-        } else {
-            sendInfection(InfectTarget::Sender);
-            sendInfection(InfectTarget::Target);
+        if (timer.elapsed() >= 1000) {
+            sendInfection(true);
+            sendInfection(false);
+            timer.restart();
         }
-
-        mutex.unlock();
     }
 }
 
-void Infector::sendInfection(InfectTarget target) {
+void Infector::sendInfection(bool toSender) {
     EthArpPacket* packet = nullptr;
-    if (target == InfectTarget::Sender) {
+
+    if (toSender) {
         packet = &senderInfectionPacket;
     } else {
         packet = &targetInfectionPacket;
     };
 
+    QMutexLocker locker(&pcapSendMutex);
     int res = pcap_sendpacket(flow.handle, reinterpret_cast<const u_char*>(packet), sizeof(EthArpPacket));
     if (res != 0) {
         emit fatalError("[Infector] 패킷 전송 실패: " + QString(pcap_geterr(flow.handle)));

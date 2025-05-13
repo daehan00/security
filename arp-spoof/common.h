@@ -2,7 +2,7 @@
 #define COMMON_H
 
 #include <QString>
-
+#include <QThread>
 #include <QQueue>
 #include <QMutex>
 #include <QWaitCondition>
@@ -53,5 +53,7 @@ private:
 };
 
 void saveMyIpMacAddr(IpFlow& flow);
+
+extern QMutex pcapSendMutex;
 
 #endif

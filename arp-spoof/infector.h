@@ -2,8 +2,6 @@
 #define INFECTOR_H
 
 # include <QThread>
-#include <QMutex>
-#include <QWaitCondition>
 #include <atomic>
 
 #include "common.h"
@@ -22,27 +20,21 @@ signals:
     void logMessage(const QString&);
     void fatalError(const QString& msg);
 
-
 protected:
     void run() override;
-
 
 private:
     IpFlow flow;
     EthArpPacket senderInfectionPacket;
     EthArpPacket targetInfectionPacket;
 
-    enum class InfectTarget {
-        Sender,
-        Target
-    };
-
-    QMutex mutex;
-    QWaitCondition cond;
     std::atomic<bool> triggered {false};
     std::atomic<bool> running {true};
 
-    void sendInfection(InfectTarget target);
+    QMutex mutex;
+    QWaitCondition cond;
+
+    void sendInfection(bool toSender);
 };
 
 #endif // INFECTOR_H

@@ -1,7 +1,6 @@
 #ifndef PACKETRELAY_H
 #define PACKETRELAY_H
 
-#include <QThread>
 #include "common.h"
 
 class PacketRelay : public QThread {
