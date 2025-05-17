@@ -5,8 +5,29 @@
 #include <linux/types.h>
 #include <linux/netfilter.h>		/* for NF_ACCEPT */
 #include <errno.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
 
 #include <libnetfilter_queue/libnetfilter_queue.h>
+
+#define MAX_DOMAINS 1
+#define MAX_DOMAIN_LEN 255
+
+char blocked_domain[MAX_DOMAIN_LEN];
+int domain_count = 0;
+
+void usage() {
+    printf("Usage: ./nfql_test <domain>\n");
+    exit(EXIT_FAILURE);
+}
+
+int is_blocked_domain(const char *host) {
+    if (strcmp(host, blocked_domain) == 0) {
+        return 1;
+    }
+    return 0;
+}
 
 /* returns packet id */
 static u_int32_t print_pkt (struct nfq_data *tb)
@@ -67,13 +88,61 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 	      struct nfq_data *nfa, void *data)
 {
-	u_int32_t id = print_pkt(nfa);
-	printf("entering callback\n");
-	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+    unsigned char *payload;
+    int len = nfq_get_payload(nfa, &payload);
+
+    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+    u_int32_t id = ph ? ntohl(ph->packet_id) : 0;
+
+    if (len >= 0) {
+        struct iphdr *ip = (struct iphdr *)payload;
+
+        if (ip->protocol == IPPROTO_TCP) {
+            int ip_header_len = ip->ihl * 4;
+            struct tcphdr *tcp = (struct tcphdr *)(payload + ip_header_len);
+            int tcp_header_len = tcp->doff * 4;
+
+            unsigned char *http_data = payload + ip_header_len + tcp_header_len;
+            int http_len = len - ip_header_len - tcp_header_len;
+
+            if (http_len > 0) {
+                const char *needle = "Host: ";
+                unsigned char *host_start = memmem(http_data, http_len, needle, strlen(needle));
+                if (host_start) {
+                    host_start += strlen(needle);
+
+                    size_t remaining_len = (http_data + http_len) - host_start;
+                    unsigned char *host_end = memchr(host_start, '\n', remaining_len);
+                    if (!host_end)
+                        host_end = http_data + http_len;
+
+                    int host_len = host_end - host_start;
+                    if (host_len > 0 && host_len < MAX_DOMAIN_LEN) {
+                        char host[MAX_DOMAIN_LEN] = {0};
+                        memcpy(host, host_start, host_len);
+                        host[strcspn(host, "\r\n")] = '\0';  // CRLF 제거
+
+                        printf("Host: %s\n", host);
+                        if (is_blocked_domain(host)) {
+                            printf(">>> Blocking request to %s\n", host);
+                            return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
 int main(int argc, char **argv)
 {
+    if (argc != 2) usage();
+
+    strncpy(blocked_domain, argv[1], MAX_DOMAIN_LEN - 1);
+    domain_count = 1;
+
 	struct nfq_handle *h;
 	struct nfq_q_handle *qh;
 	struct nfnl_handle *nh;
@@ -113,11 +182,14 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	fd = nfq_fd(h);
+    printf("[+] Blocking %d domains:\n", domain_count);
+    printf("  - %s\n", blocked_domain);
+
+    fd = nfq_fd(h);
 
 	for (;;) {
 		if ((rv = recv(fd, buf, sizeof(buf), 0)) >= 0) {
-			printf("pkt received\n");
+            // printf("pkt received\n");
 			nfq_handle_packet(h, buf, rv);
 			continue;
 		}
