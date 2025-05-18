@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -15,14 +16,15 @@
 #include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
-
-std::unordered_set<std::string> blockedDomains;
+std::unordered_set<std::string> blockedHashSet;
+std::vector<std::string> blockedBinaryList;
+std::vector<std::string> blockedLinearList;
 bool trackPerformance = false;
-std::chrono::steady_clock::duration classifyDuration;
+std::string strategy = "hash";
 
 void usage(const std::string& progName) {
-    std::cout << "Usage: " << progName << " <site list file> [-t]\n"
-              << "sample: " << progName << " top-1m.csv -t" << std::endl;
+    std::cout << "Usage: " << progName << " <site list file> [-t] [-s hash|linear|binary]\n"
+              << "sample: " << progName << " top-1m.csv -t -s hash" << std::endl;
     std::exit(EXIT_FAILURE);
 }
 
@@ -44,32 +46,59 @@ void loadBlocklist(const std::string& filename) {
         auto commaPos = line.find(',');
         if (commaPos == std::string::npos) continue;
         std::string domain = line.substr(commaPos + 1);
-        blockedDomains.insert(domain);
+
+        if (strategy == "hash")
+            blockedHashSet.insert(std::move(domain));
+        else if (strategy == "linear")
+            blockedLinearList.emplace_back(std::move(domain));
+        else if (strategy == "binary")
+            blockedBinaryList.emplace_back(std::move(domain));
     }
     infile.close();
 
+    if (strategy == "binary") {
+        std::sort(blockedBinaryList.begin(), blockedBinaryList.end());
+        blockedBinaryList.erase(std::unique(blockedBinaryList.begin(), blockedBinaryList.end()), blockedBinaryList.end());
+    }
+
     auto end = steady_clock::now();
-    std::cout << "[+] Loaded " << blockedDomains.size() << " blocked domains." << std::endl;
+    std::cout << "[+] Loaded blocklist (" << strategy << "): "
+              << (strategy == "hash" ? blockedHashSet.size() :
+                      strategy == "linear" ? blockedLinearList.size() :
+                      blockedBinaryList.size())
+              << " entries." << std::endl;
 
     if (trackPerformance) {
         getrusage(RUSAGE_SELF, &after);
         auto ms = duration_cast<milliseconds>(end - start).count();
         long mem_kb = after.ru_maxrss - before.ru_maxrss;
-        std::cout << "[T] Blocklist load time: " << ms << " ms\n";
-        std::cout << "[T] Memory usage: " << mem_kb << " KB\n";
+        std::cout << "    Blocklist load time: " << ms << " ms\n";
+        std::cout << "    Memory usage: " << mem_kb << " KB\n";
     }
 }
 
 bool isBlockedDomain(std::string_view host) {
-    if (!trackPerformance)
-        return blockedDomains.find(std::string(host)) != blockedDomains.end();
+    using namespace std::chrono;
+    auto start = steady_clock::now();
+    bool result = false;
 
-    auto start = std::chrono::steady_clock::now();
-    bool result = blockedDomains.find(std::string(host)) != blockedDomains.end();
-    auto end = std::chrono::steady_clock::now();
+    if (strategy == "hash") {
+        result = blockedHashSet.find(std::string(host)) != blockedHashSet.end();
+    } else if (strategy == "linear") {
+        for (const auto& d : blockedLinearList)
+            if (d == host) {
+                result = true;
+                break;
+            }
+    } else if (strategy == "binary") {
+        result = std::binary_search(blockedBinaryList.begin(), blockedBinaryList.end(), std::string(host));
+    }
 
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-    std::cout << "    Classification time: " << duration << " ns"<< std::endl;
+    auto end = steady_clock::now();
+    if (trackPerformance) {
+        auto ns = duration_cast<nanoseconds>(end - start).count();
+        std::cout << "    Classification time: " << ns << " ns for host: " << host << std::endl;
+    }
 
     return result;
 }
@@ -131,15 +160,22 @@ int main(int argc, char* argv[]) {
     if (argc < 2) usage(argv[0]);
 
     std::string filename;
-
-    if (argc == 2) {
-        filename = argv[1];
-    } else if (argc == 3 && std::string(argv[2]) == "-t") {
-        trackPerformance = true;
-        filename = argv[1];
-    } else {
-        usage(argv[0]);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-t") {
+            trackPerformance = true;
+        } else if (arg == "-s") {
+            if (i + 1 >= argc) usage(argv[0]);
+            strategy = argv[++i];
+            if (strategy != "hash" && strategy != "linear" && strategy != "binary") usage(argv[0]);
+        } else if (filename.empty()) {
+            filename = arg;
+        } else {
+            usage(argv[0]);
+        }
     }
+
+    if (filename.empty()) usage(argv[0]);
 
     loadBlocklist(filename);
 
@@ -182,4 +218,3 @@ int main(int argc, char* argv[]) {
     nfq_close(h);
     return 0;
 }
-
