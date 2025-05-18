@@ -1,11 +1,14 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_set>
 #include <cstring>
 #include <csignal>
 #include <cstdlib>
+#include <chrono>
+#include <sys/resource.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -14,14 +17,22 @@
 
 
 std::unordered_set<std::string> blockedDomains;
+bool trackPerformance = false;
+std::chrono::steady_clock::duration classifyDuration;
 
 void usage(const std::string& progName) {
-    std::cout << "Usage: " << progName << " <site list file>\n"
-              << "sample: " << progName << " top-1m.csv" << std::endl;
+    std::cout << "Usage: " << progName << " <site list file> [-t]\n"
+              << "sample: " << progName << " top-1m.csv -t" << std::endl;
     std::exit(EXIT_FAILURE);
 }
 
 void loadBlocklist(const std::string& filename) {
+    using namespace std::chrono;
+    auto start = steady_clock::now();
+
+    struct rusage before = {}, after = {};
+    if (trackPerformance) getrusage(RUSAGE_SELF, &before);
+
     std::ifstream infile(filename);
     if (!infile.is_open()) {
         std::cerr << "Failed to open file: " << filename << std::endl;
@@ -37,11 +48,30 @@ void loadBlocklist(const std::string& filename) {
     }
     infile.close();
 
+    auto end = steady_clock::now();
     std::cout << "[+] Loaded " << blockedDomains.size() << " blocked domains." << std::endl;
+
+    if (trackPerformance) {
+        getrusage(RUSAGE_SELF, &after);
+        auto ms = duration_cast<milliseconds>(end - start).count();
+        long mem_kb = after.ru_maxrss - before.ru_maxrss;
+        std::cout << "[T] Blocklist load time: " << ms << " ms\n";
+        std::cout << "[T] Memory usage: " << mem_kb << " KB\n";
+    }
 }
 
 bool isBlockedDomain(std::string_view host) {
-    return blockedDomains.find(std::string(host)) != blockedDomains.end();
+    if (!trackPerformance)
+        return blockedDomains.find(std::string(host)) != blockedDomains.end();
+
+    auto start = std::chrono::steady_clock::now();
+    bool result = blockedDomains.find(std::string(host)) != blockedDomains.end();
+    auto end = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "    Classification time: " << duration << " ns"<< std::endl;
+
+    return result;
 }
 
 bool extractHostFromPayload(unsigned char* payload, int len, std::string_view& hostView) {
@@ -98,9 +128,20 @@ static int packetCallback(struct nfq_q_handle* qh, struct nfgenmsg*, struct nfq_
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) usage(argv[0]);
+    if (argc < 2) usage(argv[0]);
 
-    loadBlocklist(argv[1]);
+    std::string filename;
+
+    if (argc == 2) {
+        filename = argv[1];
+    } else if (argc == 3 && std::string(argv[2]) == "-t") {
+        trackPerformance = true;
+        filename = argv[1];
+    } else {
+        usage(argv[0]);
+    }
+
+    loadBlocklist(filename);
 
     struct nfq_handle* h = nfq_open();
     if (!h) {
