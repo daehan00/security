@@ -1,20 +1,20 @@
+#include <regex>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <fstream>
+#include <cstdlib>
 #include <iostream>
 #include <algorithm>
-#include <fstream>
-#include <string>
-#include <string_view>
-#include <vector>
 #include <unordered_set>
-#include <cstring>
-#include <csignal>
-#include <cstdlib>
-#include <chrono>
-#include <sys/resource.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <sys/resource.h>
 #include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
+
+using Timer = std::chrono::steady_clock;
 
 std::unordered_set<std::string> blockedHashSet;
 std::vector<std::string> blockedBinaryList;
@@ -29,8 +29,7 @@ void usage(const std::string& progName) {
 }
 
 void loadBlocklist(const std::string& filename) {
-    using namespace std::chrono;
-    auto start = steady_clock::now();
+    auto start = Timer::now();
 
     struct rusage before = {}, after = {};
     if (trackPerformance) getrusage(RUSAGE_SELF, &before);
@@ -61,7 +60,7 @@ void loadBlocklist(const std::string& filename) {
         blockedBinaryList.erase(std::unique(blockedBinaryList.begin(), blockedBinaryList.end()), blockedBinaryList.end());
     }
 
-    auto end = steady_clock::now();
+    auto end = Timer::now();
     std::cout << "[+] Loaded blocklist (" << strategy << "): "
               << (strategy == "hash" ? blockedHashSet.size() :
                       strategy == "linear" ? blockedLinearList.size() :
@@ -70,40 +69,35 @@ void loadBlocklist(const std::string& filename) {
 
     if (trackPerformance) {
         getrusage(RUSAGE_SELF, &after);
-        auto ms = duration_cast<milliseconds>(end - start).count();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
         long mem_kb = after.ru_maxrss - before.ru_maxrss;
         std::cout << "    Blocklist load time: " << ms << " ms\n";
         std::cout << "    Memory usage: " << mem_kb << " KB\n";
     }
 }
 
-bool isBlockedDomain(std::string_view host) {
-    using namespace std::chrono;
-    auto start = steady_clock::now();
+bool isBlockedDomain(std::string host) {
+    auto start = Timer::now();
     bool result = false;
 
     if (strategy == "hash") {
-        result = blockedHashSet.find(std::string(host)) != blockedHashSet.end();
+        result = blockedHashSet.find(host) != blockedHashSet.end();
     } else if (strategy == "linear") {
-        for (const auto& d : blockedLinearList)
-            if (d == host) {
-                result = true;
-                break;
-            }
+        result = std::find(blockedBinaryList.begin(), blockedLinearList.end(), host) != blockedLinearList.end();
     } else if (strategy == "binary") {
-        result = std::binary_search(blockedBinaryList.begin(), blockedBinaryList.end(), std::string(host));
+        result = std::binary_search(blockedBinaryList.begin(), blockedBinaryList.end(), host);
     }
 
-    auto end = steady_clock::now();
+    auto end = Timer::now();
     if (trackPerformance) {
-        auto ns = duration_cast<nanoseconds>(end - start).count();
-        std::cout << "    Classification time: " << ns << " ns for host: " << host << std::endl;
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        std::cout << "    Searching time: " << ns << std::endl;
     }
 
     return result;
 }
 
-bool extractHostFromPayload(unsigned char* payload, int len, std::string_view& hostView) {
+bool extractHostFromPayload(unsigned char* payload, int len, std::string& host) {
     auto* ip = reinterpret_cast<iphdr*>(payload);
     if (ip->protocol != IPPROTO_TCP) return false;
 
@@ -115,26 +109,16 @@ bool extractHostFromPayload(unsigned char* payload, int len, std::string_view& h
     int httpLen = len - ipHeaderLen - tcpHeaderLen;
     if (httpLen <= 0) return false;
 
-    const char* needle = "Host: ";
-    unsigned char* hostStart = static_cast<unsigned char*>(
-        memmem(httpData, httpLen, needle, std::strlen(needle)));
-    if (!hostStart) return false;
+    std::string httpPayload(reinterpret_cast<char*>(httpData), httpLen);
+    static const std::regex hostRegex(R"(Host:\s*([^\r\n]+))", std::regex::icase);
+    std::smatch match;
 
-    hostStart += std::strlen(needle);
-    size_t remainingLen = httpData + httpLen - hostStart;
-    unsigned char* hostEnd = static_cast<unsigned char*>(
-        std::memchr(hostStart, '\n', remainingLen));
-    if (!hostEnd) hostEnd = httpData + httpLen;
-
-    int hostLen = hostEnd - hostStart;
-    if (hostLen <= 0 || hostLen >= 256) return false;
-
-    hostView = std::string_view(reinterpret_cast<char*>(hostStart), hostLen);
-    while (!hostView.empty() && (hostView.back() == '\r' || hostView.back() == '\n')) {
-        hostView.remove_suffix(1);
+    if (std::regex_search(httpPayload, match, hostRegex)) {
+        host = match[1].str();
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 static int packetCallback(struct nfq_q_handle* qh, struct nfgenmsg*, struct nfq_data* nfa, void*) {
@@ -146,7 +130,7 @@ static int packetCallback(struct nfq_q_handle* qh, struct nfgenmsg*, struct nfq_
 
     if (len < 0) return nfq_set_verdict(qh, id, NF_ACCEPT, 0, nullptr);
 
-    std::string_view host;
+    std::string host;
     if (extractHostFromPayload(payload, len, host)) {
         if (isBlockedDomain(host)) {
             std::cout << ">>> Request to <" << host << "> Blocked." << std::endl;
