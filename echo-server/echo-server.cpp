@@ -1,14 +1,11 @@
+#include <thread>
+#include <algorithm>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <thread>
-#include <vector>
-#include <mutex>
-#include <algorithm>
-
 #include "myQueue.h"
 
 void myerror(const char* msg) { fprintf(stderr, "%s %s %d\n", msg, strerror(errno), errno); }
@@ -115,8 +112,8 @@ void recvThread(int sd, std::shared_ptr<myQueue> clientQueue = nullptr) {
 	printf("disconnected\n");
 	fflush(stdout);
 
-    if (isBroadcast && queueSendThread.joinable())
-        queueSendThread.detach();
+    if (isBroadcast && bThread.joinable())
+        bThread.detach();
 
     if (isBroadcast) {
         std::lock_guard<std::mutex> lock(queuesMutex);
